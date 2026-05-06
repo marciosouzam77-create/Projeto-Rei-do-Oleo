@@ -1,0 +1,6 @@
+{
+  "name": "Rei do Óleo - Santa Terezinha",
+  "description": "Sistema de gerenciamento de troca de óleo com cadastro de clientes, veículos e avisos automáticos via WhatsApp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
