@@ -74,12 +74,12 @@ Situação atual: MVP funcional com CRUD básico de clientes, veículos e servi�
 
 | Item | Descrição |
 |---|---|
-| **Criação de orçamento** | Vincular ao check-in, selecionar serviços do catálogo, adicionar peças e mão de obra avulsa. |
-| **Itens avulsos (peças)** | Adicionar peças e mão de obra avulsa ao orçamento com descrição e preço unitário. |
-| **Aprovação pelo cliente** | Orçamento com status `Pendente / Aprovado / Recusado`. Admin pode registrar aprovação presencial ou enviar link. |
-| **Envio via WhatsApp** | Enviar resumo do orçamento direto para o celular do cliente com link de aprovação. |
-| **Geração de PDF** | Gerar PDF do orçamento com logo da oficina, dados do cliente, veículo, itens, valores e assinatura. |
-| **Validade do orçamento** | Definir prazo de validade e alertar quando vencer. |
+| ✅ **Criação de orçamento** | Vincular ao check-in, selecionar serviços do catálogo, adicionar peças e mão de obra avulsa. |
+| ✅ **Itens avulsos (peças)** | Adicionar peças e mão de obra avulsa ao orçamento com descrição e preço unitário. |
+| ✅ **Aprovação pelo cliente** | Orçamento com status `Pendente / Aprovado / Recusado`. Admin registra aprovação presencial. |
+| ✅ **Envio via WhatsApp** | Enviar resumo do orçamento direto para o celular do cliente. |
+| ✅ **Geração de PDF** | Gerar PDF do orçamento com logo da oficina, dados do cliente, veículo, itens, valores e assinatura. |
+| ✅ **Validade do orçamento** | Definir prazo de validade (3/7/15/30 dias) com alerta de expirado. |
 
 ### 2.6 Check-out do Veículo
 

@@ -336,6 +336,44 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Budgets (Orçamentos)
+  app.get("/api/budgets", (req, res) => {
+    const data = getData();
+    res.json(data.budgets || []);
+  });
+
+  app.post("/api/budgets", (req, res) => {
+    const data = getData();
+    if (!data.budgets) data.budgets = [];
+    const budget = { ...req.body, id: uuidv4(), createdAt: new Date().toISOString(), status: 'Pendente' };
+    data.budgets.push(budget);
+    saveData(data);
+    res.json(budget);
+  });
+
+  app.put("/api/budgets/:id", (req, res) => {
+    const { id } = req.params;
+    const data = getData();
+    if (!data.budgets) data.budgets = [];
+    const index = data.budgets.findIndex((b: any) => b.id === id);
+    if (index !== -1) {
+      data.budgets[index] = { ...data.budgets[index], ...req.body };
+      saveData(data);
+      res.json(data.budgets[index]);
+    } else {
+      res.status(404).json({ error: "Orçamento não encontrado" });
+    }
+  });
+
+  app.delete("/api/budgets/:id", (req, res) => {
+    const { id } = req.params;
+    const data = getData();
+    if (!data.budgets) data.budgets = [];
+    data.budgets = data.budgets.filter((b: any) => b.id !== id);
+    saveData(data);
+    res.json({ success: true });
+  });
+
   // Service Catalog
   app.get("/api/catalog", (req, res) => {
     const data = getData();

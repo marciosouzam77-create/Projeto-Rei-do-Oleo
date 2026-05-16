@@ -103,6 +103,31 @@ export const PAYMENT_METHODS: PaymentMethod[] = ['Dinheiro', 'Cartão Débito', 
 
 export type ServiceExecutionStatus = 'Realizado' | 'Não realizado' | 'Adiado';
 
+export type BudgetStatus = 'Pendente' | 'Aprovado' | 'Recusado';
+export type BudgetItemType = 'Serviço' | 'Peça' | 'Mão de obra';
+
+export interface BudgetItem {
+  id: string;
+  description: string;
+  type: BudgetItemType;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface Budget {
+  id: string;
+  checkinId?: string;
+  vehicleId: string;
+  createdAt: string;
+  validUntil: string;
+  status: BudgetStatus;
+  items: BudgetItem[];
+  notes?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  rejectedReason?: string;
+}
+
 export interface CheckoutData {
   finalKm: number;
   paymentMethod: PaymentMethod;

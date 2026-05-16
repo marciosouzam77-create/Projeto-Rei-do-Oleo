@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import {
-  Customer, Vehicle, Service, CheckIn, ServiceCatalogItem,
+  Customer, Vehicle, Service, CheckIn, ServiceCatalogItem, Budget,
   FUEL_TYPES, COLORS, OS_STATUS_FLOW, OSStatus, CHECKLIST_ITEMS,
   SERVICE_CATEGORIES, ServiceCategory,
 } from '../types';
@@ -17,6 +17,8 @@ import ServiceForm from './ServiceForm';
 import CheckInForm from './CheckInForm';
 import CheckOutForm from './CheckOutForm';
 import OSPrintModal from './OSPrintModal';
+import BudgetForm from './BudgetForm';
+import BudgetPrintModal from './BudgetPrintModal';
 
 const STATUS_COLORS: Record<OSStatus, string> = {
   'Aguardando':  'bg-yellow-100 text-yellow-700',
@@ -26,7 +28,7 @@ const STATUS_COLORS: Record<OSStatus, string> = {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'checkins' | 'customers' | 'vehicles' | 'services' | 'catalog'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'checkins' | 'budgets' | 'customers' | 'vehicles' | 'services' | 'catalog'>('overview');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -44,6 +46,11 @@ export default function AdminDashboard() {
   const [editingCheckIn, setEditingCheckIn] = useState<CheckIn | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckIn | null>(null);
   const [printTarget, setPrintTarget] = useState<CheckIn | null>(null);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [showBudgetForm, setShowBudgetForm] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [budgetFromCheckin, setBudgetFromCheckin] = useState<CheckIn | null>(null);
+  const [printBudget, setPrintBudget] = useState<Budget | null>(null);
   const [expandedCheckIn, setExpandedCheckIn] = useState<string | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,13 +62,14 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [c, v, s, r, ci, cat] = await Promise.all([
+      const [c, v, s, r, ci, cat, bud] = await Promise.all([
         api.get('/customers'),
         api.get('/vehicles'),
         api.get('/services'),
         api.get('/reminders'),
         api.get('/checkins'),
         api.get('/catalog'),
+        api.get('/budgets'),
       ]);
       setCustomers(c || []);
       setVehicles(v || []);
@@ -69,6 +77,7 @@ export default function AdminDashboard() {
       setReminders(r || []);
       setCheckins(ci || []);
       setCatalog(cat || []);
+      setBudgets(bud || []);
 
       // Automatic Notification Prompt
       const overdue = (r || []).filter((rem: any) => rem.daysLeft <= 0 || rem.kmRemaining <= 0);
@@ -128,6 +137,7 @@ export default function AdminDashboard() {
         {([
           { key: 'overview',   label: 'Início' },
           { key: 'checkins',   label: 'Ordens de Serviço' },
+          { key: 'budgets',    label: 'Orçamentos' },
           { key: 'customers',  label: 'Clientes' },
           { key: 'vehicles',   label: 'Veículos' },
           { key: 'services',   label: 'Histórico' },
@@ -146,6 +156,11 @@ export default function AdminDashboard() {
             {tab.key === 'checkins' && checkins.filter(c => c.status !== 'Entregue').length > 0 && (
               <span className="ml-2 bg-amber-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
                 {checkins.filter(c => c.status !== 'Entregue').length}
+              </span>
+            )}
+            {tab.key === 'budgets' && budgets.filter(b => b.status === 'Pendente').length > 0 && (
+              <span className="ml-2 bg-yellow-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                {budgets.filter(b => b.status === 'Pendente').length}
               </span>
             )}
           </button>
@@ -407,6 +422,13 @@ export default function AdminDashboard() {
                                 → {OS_STATUS_FLOW[OS_STATUS_FLOW.indexOf(status) + 1]}
                               </button>
                             ) : null}
+                            <button
+                              onClick={() => { setBudgetFromCheckin(ci); setShowBudgetForm(true); }}
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                              title="Criar Orçamento"
+                            >
+                              <span className="text-[10px] font-black">R$</span>
+                            </button>
                             <button
                               onClick={() => setPrintTarget(ci)}
                               className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 rounded-lg transition-all"
@@ -734,6 +756,22 @@ export default function AdminDashboard() {
         </div>
       )}
       
+      {/* Orçamentos */}
+      {activeTab === 'budgets' && (
+        <BudgetsTab
+          budgets={budgets}
+          vehicles={vehicles}
+          customers={customers}
+          catalog={catalog}
+          onNew={() => { setEditingBudget(null); setBudgetFromCheckin(null); setShowBudgetForm(true); }}
+          onEdit={b => { setEditingBudget(b); setShowBudgetForm(true); }}
+          onPrint={b => setPrintBudget(b)}
+          onRefresh={fetchData}
+          vehicles2={vehicles}
+          customers2={customers}
+        />
+      )}
+
       {/* Catálogo de Serviços */}
       {activeTab === 'catalog' && (
         <ServiceCatalogTab catalog={catalog} onRefresh={fetchData} />
@@ -775,6 +813,32 @@ export default function AdminDashboard() {
             vehicle={vehicle}
             customer={customer}
             onClose={() => { setCheckoutTarget(null); fetchData(); }}
+          />
+        );
+      })()}
+
+      {showBudgetForm && (
+        <BudgetForm
+          onClose={() => { setShowBudgetForm(false); setEditingBudget(null); setBudgetFromCheckin(null); fetchData(); }}
+          customers={customers}
+          vehicles={vehicles}
+          catalog={catalog}
+          checkinId={budgetFromCheckin?.id}
+          preselectedVehicleId={budgetFromCheckin?.vehicleId}
+          initialData={editingBudget}
+        />
+      )}
+
+      {printBudget && (() => {
+        const vehicle = vehicles.find(v => v.id === printBudget.vehicleId);
+        const customer = customers.find(c => c.id === vehicle?.customerId);
+        if (!vehicle || !customer) return null;
+        return (
+          <BudgetPrintModal
+            budget={printBudget}
+            vehicle={vehicle}
+            customer={customer}
+            onClose={() => setPrintBudget(null)}
           />
         );
       })()}
@@ -1068,6 +1132,214 @@ function VehicleForm({ onClose, customers, initialData }: { onClose: () => void,
           </div>
         </form>
       </motion.div>
+    </div>
+  );
+}
+
+// --- Orçamentos ---
+
+interface BudgetsTabProps {
+  budgets: Budget[];
+  vehicles: Vehicle[];
+  customers: Customer[];
+  catalog: ServiceCatalogItem[];
+  onNew: () => void;
+  onEdit: (b: Budget) => void;
+  onPrint: (b: Budget) => void;
+  onRefresh: () => void;
+  vehicles2: Vehicle[];
+  customers2: Customer[];
+}
+
+function BudgetsTab({ budgets, vehicles, customers, onNew, onEdit, onPrint, onRefresh }: BudgetsTabProps) {
+  const [filter, setFilter] = useState<'Todos' | 'Pendente' | 'Aprovado' | 'Recusado'>('Todos');
+
+  const filtered = budgets.filter(b => filter === 'Todos' || b.status === filter)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const sendWhatsApp = (budget: Budget) => {
+    const vehicle = vehicles.find(v => v.id === budget.vehicleId);
+    const customer = customers.find(c => c.id === vehicle?.customerId);
+    if (!vehicle || !customer) return;
+
+    const total = budget.items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0);
+    const itemLines = budget.items.map(i => `• ${i.description} — R$ ${(i.quantity * i.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`).join('\n');
+    const validDate = new Date(budget.validUntil).toLocaleDateString('pt-BR');
+
+    const message = `Olá, ${customer.name}! 👋\n\nAqui é do *Rei do Óleo — Santa Terezinha*.\n\nSegue o orçamento para seu *${vehicle.brand} ${vehicle.model} (${vehicle.plate})*:\n\n${itemLines}\n\n*Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n\nOrçamento válido até ${validDate}.${budget.notes ? `\n\n_${budget.notes}_` : ''}\n\nQualquer dúvida, estamos à disposição!\n📞 (11) 2677-8409\n📍 Al. Vieira de Carvalho, 145 — Santo André/SP`;
+
+    window.open(`https://wa.me/55${customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const updateStatus = async (budget: Budget, status: Budget['status']) => {
+    const extra: any = {};
+    if (status === 'Aprovado') extra.approvedAt = new Date().toISOString();
+    if (status === 'Recusado') extra.rejectedAt = new Date().toISOString();
+    await api.put(`/budgets/${budget.id}`, { status, ...extra });
+    onRefresh();
+  };
+
+  const deleteBudget = async (id: string) => {
+    if (!confirm('Excluir este orçamento?')) return;
+    await api.delete(`/budgets/${id}`);
+    onRefresh();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+        <h2 className="text-xl font-bold">Orçamentos</h2>
+        <div className="flex gap-2 flex-wrap">
+          {(['Todos', 'Pendente', 'Aprovado', 'Recusado'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                filter === f
+                  ? 'bg-amber-500 text-white border-amber-500'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-amber-300'
+              }`}
+            >
+              {f}
+              {f !== 'Todos' && (
+                <span className="ml-1 opacity-70">({budgets.filter(b => b.status === f).length})</span>
+              )}
+            </button>
+          ))}
+          <button
+            onClick={onNew}
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 text-white rounded-full text-xs font-bold shadow-md shadow-amber-100"
+          >
+            <Plus size={14} /> Novo
+          </button>
+        </div>
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="bg-white rounded-2xl p-12 text-center text-gray-400 border border-gray-100 shadow-sm">
+          Nenhum orçamento {filter !== 'Todos' ? filter.toLowerCase() : ''} encontrado.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {filtered.map(budget => {
+          const vehicle = vehicles.find(v => v.id === budget.vehicleId);
+          const customer = customers.find(c => c.id === vehicle?.customerId);
+          const total = budget.items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0);
+          const isExpired = new Date(budget.validUntil) < new Date() && budget.status === 'Pendente';
+
+          return (
+            <div key={budget.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
+              isExpired ? 'border-red-200' : 'border-gray-100'
+            }`}>
+              <div className="p-4">
+                {/* Header do card */}
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="font-bold text-gray-800">{customer?.name || '—'}</p>
+                    <p className="text-xs font-mono text-amber-600 font-bold">{vehicle?.plate} · {vehicle?.brand} {vehicle?.model}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      #{budget.id.slice(-6).toUpperCase()} · {new Date(budget.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${
+                    budget.status === 'Aprovado' ? 'bg-green-100 text-green-700' :
+                    budget.status === 'Recusado' ? 'bg-red-100 text-red-600' :
+                    isExpired ? 'bg-red-50 text-red-500' : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {isExpired ? 'Expirado' : budget.status}
+                  </span>
+                </div>
+
+                {/* Itens */}
+                <div className="space-y-1 mb-3">
+                  {budget.items.slice(0, 3).map(item => (
+                    <div key={item.id} className="flex justify-between text-xs">
+                      <span className="text-gray-600 truncate mr-2">{item.quantity}× {item.description}</span>
+                      <span className="font-semibold text-gray-700 shrink-0">
+                        R$ {(item.quantity * item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))}
+                  {budget.items.length > 3 && (
+                    <p className="text-[10px] text-gray-400">+{budget.items.length - 3} item(s)...</p>
+                  )}
+                </div>
+
+                {/* Total e validade */}
+                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                  <p className="text-[10px] text-gray-400">
+                    Válido até {new Date(budget.validUntil).toLocaleDateString('pt-BR')}
+                  </p>
+                  <p className="font-black text-green-600">
+                    R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2">
+                {/* Aprovação */}
+                {budget.status === 'Pendente' && (
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => updateStatus(budget, 'Aprovado')}
+                      className="px-3 py-1.5 bg-green-500 text-white text-[10px] font-black rounded-lg hover:bg-green-600 transition-colors"
+                    >
+                      Aprovar
+                    </button>
+                    <button
+                      onClick={() => updateStatus(budget, 'Recusado')}
+                      className="px-3 py-1.5 bg-red-100 text-red-600 text-[10px] font-black rounded-lg hover:bg-red-200 transition-colors"
+                    >
+                      Recusar
+                    </button>
+                  </div>
+                )}
+                {budget.status !== 'Pendente' && (
+                  <button
+                    onClick={() => updateStatus(budget, 'Pendente')}
+                    className="text-[10px] text-gray-400 hover:text-amber-600 font-bold"
+                  >
+                    Reabrir
+                  </button>
+                )}
+
+                <div className="flex gap-1 ml-auto">
+                  <button
+                    onClick={() => sendWhatsApp(budget)}
+                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all"
+                    title="Enviar via WhatsApp"
+                  >
+                    <MessageCircle size={15} />
+                  </button>
+                  <button
+                    onClick={() => onPrint(budget)}
+                    className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 rounded-lg transition-all"
+                    title="Imprimir / PDF"
+                  >
+                    <Printer size={15} />
+                  </button>
+                  <button
+                    onClick={() => onEdit(budget)}
+                    className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                    title="Editar"
+                  >
+                    <Edit3 size={15} />
+                  </button>
+                  <button
+                    onClick={() => deleteBudget(budget.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="Excluir"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
