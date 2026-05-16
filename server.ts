@@ -14,6 +14,7 @@ const DATA_FILE = path.join(__dirname, "data.json");
 if (!fs.existsSync(DATA_FILE)) {
   const initialData = {
     users: [], // Admins
+    checkins: [],
     customers: [
       { id: "1", name: "João Silva", phone: "41999999999", email: "joao@example.com", createdAt: new Date().toISOString() }
     ],
@@ -273,6 +274,44 @@ async function startServer() {
     const { id } = req.params;
     const data = getData();
     data.vehicles = data.vehicles.filter((v: any) => v.id !== id);
+    saveData(data);
+    res.json({ success: true });
+  });
+
+  // Check-ins (Ordens de Serviço)
+  app.get("/api/checkins", (req, res) => {
+    const data = getData();
+    res.json(data.checkins || []);
+  });
+
+  app.post("/api/checkins", (req, res) => {
+    const data = getData();
+    if (!data.checkins) data.checkins = [];
+    const newCheckIn = { ...req.body, id: uuidv4(), createdAt: new Date().toISOString(), status: 'Aguardando' };
+    data.checkins.push(newCheckIn);
+    saveData(data);
+    res.json(newCheckIn);
+  });
+
+  app.put("/api/checkins/:id", (req, res) => {
+    const { id } = req.params;
+    const data = getData();
+    if (!data.checkins) data.checkins = [];
+    const index = data.checkins.findIndex((c: any) => c.id === id);
+    if (index !== -1) {
+      data.checkins[index] = { ...data.checkins[index], ...req.body };
+      saveData(data);
+      res.json(data.checkins[index]);
+    } else {
+      res.status(404).json({ error: "Check-in não encontrado" });
+    }
+  });
+
+  app.delete("/api/checkins/:id", (req, res) => {
+    const { id } = req.params;
+    const data = getData();
+    if (!data.checkins) data.checkins = [];
+    data.checkins = data.checkins.filter((c: any) => c.id !== id);
     saveData(data);
     res.json({ success: true });
   });
