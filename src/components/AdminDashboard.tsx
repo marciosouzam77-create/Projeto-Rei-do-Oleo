@@ -4,12 +4,18 @@ import { motion } from 'motion/react';
 import {
   Users, Car, Plus, Search, Bell, History,
   MessageCircle, TrendingUp, Calendar, AlertTriangle,
-  ChevronRight, X, ClipboardList, CheckCircle, XCircle, MinusCircle, ChevronDown
+  ChevronRight, X, ClipboardList, CheckCircle, XCircle, MinusCircle, ChevronDown,
+  Settings, Trash2, Edit3, Clock
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { Customer, Vehicle, Service, CheckIn, FUEL_TYPES, COLORS, OS_STATUS_FLOW, OSStatus, CHECKLIST_ITEMS } from '../types';
+import {
+  Customer, Vehicle, Service, CheckIn, ServiceCatalogItem,
+  FUEL_TYPES, COLORS, OS_STATUS_FLOW, OSStatus, CHECKLIST_ITEMS,
+  SERVICE_CATEGORIES, ServiceCategory,
+} from '../types';
 import ServiceForm from './ServiceForm';
 import CheckInForm from './CheckInForm';
+import CheckOutForm from './CheckOutForm';
 
 const STATUS_COLORS: Record<OSStatus, string> = {
   'Aguardando':  'bg-yellow-100 text-yellow-700',
@@ -19,20 +25,23 @@ const STATUS_COLORS: Record<OSStatus, string> = {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'checkins' | 'customers' | 'vehicles' | 'services'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'checkins' | 'customers' | 'vehicles' | 'services' | 'catalog'>('overview');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [reminders, setReminders] = useState<any[]>([]);
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
+  const [catalog, setCatalog] = useState<ServiceCatalogItem[]>([]);
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [showCheckInForm, setShowCheckInForm] = useState(false);
   const [editingCheckIn, setEditingCheckIn] = useState<CheckIn | null>(null);
+  const [checkoutTarget, setCheckoutTarget] = useState<CheckIn | null>(null);
   const [expandedCheckIn, setExpandedCheckIn] = useState<string | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,18 +53,20 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [c, v, s, r, ci] = await Promise.all([
+      const [c, v, s, r, ci, cat] = await Promise.all([
         api.get('/customers'),
         api.get('/vehicles'),
         api.get('/services'),
         api.get('/reminders'),
         api.get('/checkins'),
+        api.get('/catalog'),
       ]);
       setCustomers(c || []);
       setVehicles(v || []);
       setServices(s || []);
       setReminders(r || []);
       setCheckins(ci || []);
+      setCatalog(cat || []);
 
       // Automatic Notification Prompt
       const overdue = (r || []).filter((rem: any) => rem.daysLeft <= 0 || rem.kmRemaining <= 0);
@@ -118,6 +129,7 @@ export default function AdminDashboard() {
           { key: 'customers',  label: 'Clientes' },
           { key: 'vehicles',   label: 'Veículos' },
           { key: 'services',   label: 'Histórico' },
+          { key: 'catalog',    label: 'Catálogo' },
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -373,8 +385,15 @@ export default function AdminDashboard() {
 
                           {/* Actions */}
                           <div className="flex gap-1 mt-2 pt-2 border-t border-gray-100">
-                            {/* Status advance */}
-                            {status !== 'Entregue' && (
+                            {/* Status advance / checkout */}
+                            {status === 'Pronto' ? (
+                              <button
+                                onClick={() => setCheckoutTarget(ci)}
+                                className="flex-1 text-[10px] font-bold py-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                              >
+                                Entregar →
+                              </button>
+                            ) : status !== 'Entregue' ? (
                               <button
                                 onClick={async () => {
                                   const nextStatus = OS_STATUS_FLOW[OS_STATUS_FLOW.indexOf(status) + 1];
@@ -385,7 +404,7 @@ export default function AdminDashboard() {
                               >
                                 → {OS_STATUS_FLOW[OS_STATUS_FLOW.indexOf(status) + 1]}
                               </button>
-                            )}
+                            ) : null}
                             <button
                               onClick={() => { setEditingCheckIn(ci); setShowCheckInForm(true); }}
                               className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
@@ -476,6 +495,13 @@ export default function AdminDashboard() {
                      <td className="px-6 py-4 text-sm text-gray-500">{c.email || '-'}</td>
                      <td className="px-6 py-4 text-sm text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</td>
                      <td className="px-6 py-4 text-right flex justify-end gap-2">
+                        <button
+                          onClick={() => setViewingCustomer(c)}
+                          className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Histórico do Cliente"
+                        >
+                          <History size={18} />
+                        </button>
                         <button
                           onClick={() => { setEditingCustomer(c); setShowCustomerForm(true); }}
                           className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
@@ -699,6 +725,11 @@ export default function AdminDashboard() {
         </div>
       )}
       
+      {/* Catálogo de Serviços */}
+      {activeTab === 'catalog' && (
+        <ServiceCatalogTab catalog={catalog} onRefresh={fetchData} />
+      )}
+
       {showServiceForm && (
         <ServiceForm
           onClose={() => {
@@ -722,6 +753,29 @@ export default function AdminDashboard() {
           customers={customers}
           vehicles={vehicles}
           initialData={editingCheckIn}
+        />
+      )}
+
+      {checkoutTarget && (() => {
+        const vehicle = vehicles.find(v => v.id === checkoutTarget.vehicleId);
+        const customer = customers.find(c => c.id === vehicle?.customerId);
+        if (!vehicle || !customer) return null;
+        return (
+          <CheckOutForm
+            checkin={checkoutTarget}
+            vehicle={vehicle}
+            customer={customer}
+            onClose={() => { setCheckoutTarget(null); fetchData(); }}
+          />
+        );
+      })()}
+
+      {viewingCustomer && (
+        <CustomerHistoryModal
+          customer={viewingCustomer}
+          vehicles={vehicles.filter(v => v.customerId === viewingCustomer.id)}
+          services={services}
+          onClose={() => setViewingCustomer(null)}
         />
       )}
 
@@ -990,6 +1044,260 @@ function VehicleForm({ onClose, customers, initialData }: { onClose: () => void,
             </button>
           </div>
         </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// --- Catálogo de Serviços ---
+
+function ServiceCatalogTab({ catalog, onRefresh }: { catalog: ServiceCatalogItem[], onRefresh: () => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<ServiceCatalogItem | null>(null);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este serviço do catálogo?')) return;
+    await api.delete(`/catalog/${id}`);
+    onRefresh();
+  };
+
+  const grouped = SERVICE_CATEGORIES.map(cat => ({
+    category: cat,
+    items: catalog.filter(s => s.category === cat),
+  })).filter(g => g.items.length > 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <Settings size={22} className="text-amber-500" /> Catálogo de Serviços
+        </h2>
+        <button
+          onClick={() => { setEditing(null); setShowForm(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-bold shadow-md shadow-amber-100"
+        >
+          <Plus size={18} /> Novo Serviço
+        </button>
+      </div>
+
+      {grouped.length === 0 && (
+        <div className="bg-white rounded-2xl p-12 text-center text-gray-400 border border-gray-100 shadow-sm">
+          Nenhum serviço cadastrado. Clique em "Novo Serviço" para começar.
+        </div>
+      )}
+
+      {grouped.map(g => (
+        <div key={g.category} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
+            <span className="text-xs font-black text-gray-500 uppercase tracking-widest">{g.category}</span>
+          </div>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-[10px] text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                <th className="px-6 py-3 font-bold">Serviço</th>
+                <th className="px-6 py-3 font-bold">Preço Base</th>
+                <th className="px-6 py-3 font-bold">Tempo Est.</th>
+                <th className="px-6 py-3 font-bold"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {g.items.map(item => (
+                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-6 py-4 font-semibold text-gray-800">{item.name}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-green-600">
+                    R$ {item.basePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    {item.estimatedMinutes ? (
+                      <span className="flex items-center gap-1">
+                        <Clock size={14} className="text-gray-400" />
+                        {item.estimatedMinutes} min
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td className="px-6 py-4 text-right flex justify-end gap-2">
+                    <button
+                      onClick={() => { setEditing(item); setShowForm(true); }}
+                      className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+
+      {showForm && (
+        <CatalogItemForm
+          initialData={editing}
+          onClose={() => { setShowForm(false); setEditing(null); onRefresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CatalogItemForm({ initialData, onClose }: { initialData?: ServiceCatalogItem | null; onClose: () => void }) {
+  const [name, setName] = useState(initialData?.name || '');
+  const [category, setCategory] = useState<ServiceCategory>(initialData?.category || 'Geral');
+  const [basePrice, setBasePrice] = useState<number>(initialData?.basePrice || 0);
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number | ''>(initialData?.estimatedMinutes || '');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const payload: any = { name, category, basePrice };
+      if (estimatedMinutes !== '') payload.estimatedMinutes = Number(estimatedMinutes);
+
+      if (initialData) {
+        await api.put(`/catalog/${initialData.id}`, payload);
+      } else {
+        await api.post('/catalog', payload);
+      }
+      onClose();
+    } catch { alert('Erro ao salvar'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
+        <h2 className="text-xl font-bold mb-6">{initialData ? 'Editar Serviço' : 'Novo Serviço'}</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase">Nome do Serviço</label>
+            <input required value={name} onChange={e => setName(e.target.value)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none mt-1" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase">Categoria</label>
+            <select value={category} onChange={e => setCategory(e.target.value as ServiceCategory)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none mt-1">
+              {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase">Preço Base (R$)</label>
+              <input type="number" required value={basePrice} onChange={e => setBasePrice(Number(e.target.value))} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono mt-1" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase">Tempo (min)</label>
+              <input type="number" value={estimatedMinutes} onChange={e => setEstimatedMinutes(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Opcional" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-mono mt-1" />
+            </div>
+          </div>
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 py-3 text-gray-400 font-bold">Cancelar</button>
+            <button disabled={loading} className="flex-1 py-3 bg-amber-500 text-white rounded-xl font-bold shadow-lg shadow-amber-200 uppercase text-sm">
+              {loading ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// --- Histórico do Cliente ---
+
+function CustomerHistoryModal({ customer, vehicles, services, onClose }: {
+  customer: Customer;
+  vehicles: Vehicle[];
+  services: Service[];
+  onClose: () => void;
+}) {
+  const customerServices = services.filter(s => vehicles.some(v => v.id === s.vehicleId));
+  const totalSpent = customerServices.reduce((acc, s) => acc + s.totalPrice, 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-bold">{customer.name}</h2>
+            <p className="text-sm text-gray-500">{customer.phone} {customer.email ? `· ${customer.email}` : ''}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Summary stats */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Veículos', val: vehicles.length },
+              { label: 'Serviços', val: customerServices.length },
+              { label: 'Total gasto', val: `R$ ${totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
+            ].map((stat, i) => (
+              <div key={i} className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
+                <p className="text-[10px] font-black text-gray-400 uppercase">{stat.label}</p>
+                <p className="text-xl font-bold text-gray-800 mt-1">{stat.val}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Vehicles and their services */}
+          {vehicles.map(vehicle => {
+            const vehicleServices = services
+              .filter(s => s.vehicleId === vehicle.id)
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+            return (
+              <div key={vehicle.id} className="border border-gray-100 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
+                  <Car size={18} className="text-amber-500" />
+                  <div>
+                    <p className="font-bold text-gray-800">{vehicle.brand} {vehicle.model} {vehicle.year ? `(${vehicle.year})` : ''}</p>
+                    <p className="text-xs font-mono text-amber-600">{vehicle.plate} · {vehicle.currentKm.toLocaleString()} km</p>
+                  </div>
+                </div>
+
+                {vehicleServices.length === 0 ? (
+                  <p className="px-5 py-4 text-sm text-gray-400">Nenhum serviço registrado.</p>
+                ) : (
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[10px] text-gray-400 uppercase tracking-widest border-b border-gray-50">
+                        <th className="px-5 py-3 font-bold">Data</th>
+                        <th className="px-5 py-3 font-bold">Óleo</th>
+                        <th className="px-5 py-3 font-bold">KM</th>
+                        <th className="px-5 py-3 font-bold">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {vehicleServices.map(s => (
+                        <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-5 py-3 text-sm text-gray-600">{new Date(s.date).toLocaleDateString()}</td>
+                          <td className="px-5 py-3 text-sm font-semibold text-gray-700">
+                            {s.oilItems?.[0] || s.oilType}
+                          </td>
+                          <td className="px-5 py-3 text-sm font-mono text-gray-500">{s.currentKm.toLocaleString()}</td>
+                          <td className="px-5 py-3 text-sm font-bold text-green-600">
+                            R$ {s.totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })}
+
+          {vehicles.length === 0 && (
+            <p className="text-center text-gray-400 py-8">Nenhum veículo cadastrado para este cliente.</p>
+          )}
+        </div>
       </motion.div>
     </div>
   );

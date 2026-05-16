@@ -13,8 +13,19 @@ const DATA_FILE = path.join(__dirname, "data.json");
 // Initialize data.json if it doesn't exist
 if (!fs.existsSync(DATA_FILE)) {
   const initialData = {
-    users: [], // Admins
+    users: [],
     checkins: [],
+    serviceCatalog: [
+      { id: '1', name: 'Troca de Óleo Motor',    category: 'Lubrificação', basePrice: 120, estimatedMinutes: 30 },
+      { id: '2', name: 'Troca de Filtro de Óleo',category: 'Filtros',      basePrice: 35,  estimatedMinutes: 15 },
+      { id: '3', name: 'Troca de Filtro de Ar',  category: 'Filtros',      basePrice: 40,  estimatedMinutes: 15 },
+      { id: '4', name: 'Troca de Filtro de Cabine', category: 'Filtros',   basePrice: 45,  estimatedMinutes: 20 },
+      { id: '5', name: 'Troca de Fluido de Freio',  category: 'Freios',    basePrice: 80,  estimatedMinutes: 30 },
+      { id: '6', name: 'Revisão de Pastilhas',   category: 'Freios',       basePrice: 60,  estimatedMinutes: 45 },
+      { id: '7', name: 'Alinhamento',            category: 'Suspensão',    basePrice: 90,  estimatedMinutes: 60 },
+      { id: '8', name: 'Balanceamento',          category: 'Suspensão',    basePrice: 80,  estimatedMinutes: 45 },
+      { id: '9', name: 'Higienização A/C',       category: 'Geral',        basePrice: 100, estimatedMinutes: 60 },
+    ],
     customers: [
       { id: "1", name: "João Silva", phone: "41999999999", email: "joao@example.com", createdAt: new Date().toISOString() }
     ],
@@ -300,6 +311,15 @@ async function startServer() {
     const index = data.checkins.findIndex((c: any) => c.id === id);
     if (index !== -1) {
       data.checkins[index] = { ...data.checkins[index], ...req.body };
+
+      // When checkout is registered, update vehicle KM
+      if (req.body.checkout && req.body.status === 'Entregue') {
+        const vehicleIndex = data.vehicles.findIndex((v: any) => v.id === data.checkins[index].vehicleId);
+        if (vehicleIndex !== -1 && req.body.checkout.finalKm) {
+          data.vehicles[vehicleIndex].currentKm = req.body.checkout.finalKm;
+        }
+      }
+
       saveData(data);
       res.json(data.checkins[index]);
     } else {
@@ -312,6 +332,44 @@ async function startServer() {
     const data = getData();
     if (!data.checkins) data.checkins = [];
     data.checkins = data.checkins.filter((c: any) => c.id !== id);
+    saveData(data);
+    res.json({ success: true });
+  });
+
+  // Service Catalog
+  app.get("/api/catalog", (req, res) => {
+    const data = getData();
+    res.json(data.serviceCatalog || []);
+  });
+
+  app.post("/api/catalog", (req, res) => {
+    const data = getData();
+    if (!data.serviceCatalog) data.serviceCatalog = [];
+    const item = { ...req.body, id: uuidv4() };
+    data.serviceCatalog.push(item);
+    saveData(data);
+    res.json(item);
+  });
+
+  app.put("/api/catalog/:id", (req, res) => {
+    const { id } = req.params;
+    const data = getData();
+    if (!data.serviceCatalog) data.serviceCatalog = [];
+    const index = data.serviceCatalog.findIndex((s: any) => s.id === id);
+    if (index !== -1) {
+      data.serviceCatalog[index] = { ...data.serviceCatalog[index], ...req.body };
+      saveData(data);
+      res.json(data.serviceCatalog[index]);
+    } else {
+      res.status(404).json({ error: "Serviço não encontrado" });
+    }
+  });
+
+  app.delete("/api/catalog/:id", (req, res) => {
+    const { id } = req.params;
+    const data = getData();
+    if (!data.serviceCatalog) data.serviceCatalog = [];
+    data.serviceCatalog = data.serviceCatalog.filter((s: any) => s.id !== id);
     saveData(data);
     res.json({ success: true });
   });
