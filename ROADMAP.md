@@ -52,7 +52,7 @@ Situação atual: MVP funcional com CRUD básico de clientes, veículos e servi�
 | **Assinatura digital** | Coletar assinatura do cliente e do técnico responsável no momento do check-in, com registro de data/hora. |
 | ✅ **Status em tempo real** | Painel kanban com fila de veículos e status: `Aguardando → Em serviço → Pronto → Entregue`. |
 | ✅ **Atribuição de mecânico** | Vincular o responsável pela execução dos serviços. |
-| **Impressão de OS** | Gerar PDF ou página de impressão da OS com dados do veículo, cliente, checklist e observações. |
+| ✅ **Impressão de OS** | Gerar PDF ou página de impressão da OS com dados do veículo, cliente, checklist e observações. |
 | **Histórico de status** | Registrar data/hora de cada mudança de status da OS (Aguardando, Em serviço, Pronto, Entregue). |
 | **Tempo de atendimento** | Calcular e exibir o tempo total decorrido desde a abertura até a entrega da OS. |
 

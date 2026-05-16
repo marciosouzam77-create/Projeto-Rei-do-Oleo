@@ -5,7 +5,7 @@ import {
   Users, Car, Plus, Search, Bell, History,
   MessageCircle, TrendingUp, Calendar, AlertTriangle,
   ChevronRight, X, ClipboardList, CheckCircle, XCircle, MinusCircle, ChevronDown,
-  Settings, Trash2, Edit3, Clock
+  Settings, Trash2, Edit3, Clock, Printer
 } from 'lucide-react';
 import { api } from '../lib/api';
 import {
@@ -16,6 +16,7 @@ import {
 import ServiceForm from './ServiceForm';
 import CheckInForm from './CheckInForm';
 import CheckOutForm from './CheckOutForm';
+import OSPrintModal from './OSPrintModal';
 
 const STATUS_COLORS: Record<OSStatus, string> = {
   'Aguardando':  'bg-yellow-100 text-yellow-700',
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
   const [showCheckInForm, setShowCheckInForm] = useState(false);
   const [editingCheckIn, setEditingCheckIn] = useState<CheckIn | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<CheckIn | null>(null);
+  const [printTarget, setPrintTarget] = useState<CheckIn | null>(null);
   const [expandedCheckIn, setExpandedCheckIn] = useState<string | null>(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -406,6 +408,13 @@ export default function AdminDashboard() {
                               </button>
                             ) : null}
                             <button
+                              onClick={() => setPrintTarget(ci)}
+                              className="p-1.5 text-gray-400 hover:text-purple-500 hover:bg-purple-50 rounded-lg transition-all"
+                              title="Imprimir OS"
+                            >
+                              <Printer size={14} />
+                            </button>
+                            <button
                               onClick={() => { setEditingCheckIn(ci); setShowCheckInForm(true); }}
                               className="p-1.5 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
                               title="Editar"
@@ -766,6 +775,20 @@ export default function AdminDashboard() {
             vehicle={vehicle}
             customer={customer}
             onClose={() => { setCheckoutTarget(null); fetchData(); }}
+          />
+        );
+      })()}
+
+      {printTarget && (() => {
+        const vehicle = vehicles.find(v => v.id === printTarget.vehicleId);
+        const customer = customers.find(c => c.id === vehicle?.customerId);
+        if (!vehicle || !customer) return null;
+        return (
+          <OSPrintModal
+            checkin={printTarget}
+            vehicle={vehicle}
+            customer={customer}
+            onClose={() => setPrintTarget(null)}
           />
         );
       })()}
