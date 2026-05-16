@@ -27,6 +27,7 @@ Situação atual: MVP funcional com CRUD básico de clientes, veículos e servi�
 | Item | Descrição |
 |---|---|
 | **Formulário completo** | Cadastro com nome, CPF/CNPJ, telefone, e-mail, endereço e observações. |
+| **Tipo de pessoa (PF/PJ)** | Campo obrigatório indicando se o cliente é Pessoa Física ou Pessoa Jurídica (empresa). Altera campos exibidos: CPF vs CNPJ, razão social vs nome. |
 | **Busca rápida** | Localizar cliente por nome, placa ou telefone na entrada do veículo. |
 | **Histórico consolidado** | Ver todos os veículos e serviços do cliente em um único lugar. |
 
@@ -44,11 +45,15 @@ Situação atual: MVP funcional com CRUD básico de clientes, veículos e servi�
 | Item | Descrição |
 |---|---|
 | **Abertura de OS** | Ao dar entrada no veículo, criar uma Ordem de Serviço com data/hora, KM atual e relato do cliente. |
-| **Recepção guiada** | Formulário de check-in com checklist rápido do estado do veículo (lataria, pneus, combustível, acessórios). |
+| **Checklist de fluidos e filtros** | Formulário guiado com os itens abaixo, cada um com avaliação de condição (Bom / Ruim / Não verificado): Fluido de freio, Óleo de direção, Óleo do motor, Fluido da transmissão automática, Fluido de câmbio manual, Fluido de arrefecimento, Pastilha de freio, Filtro de ar, Filtro de combustível, Filtro de cabine, Filtro de óleo. |
+| **Condição Bom/Ruim** | Para cada item do checklist, registrar se está em bom estado ou precisa de atenção, gerando automaticamente a lista de serviços recomendados. |
+| **Fotos no check-in** | Permitir anexar fotos do veículo na entrada (lataria, painel, odômetro, pneus) para registro do estado de recebimento. |
+| **Campo de observações** | Texto livre para o técnico registrar detalhes adicionais observados na inspeção. |
+| **Assinatura digital** | Coletar assinatura do cliente e do técnico responsável no momento do check-in, com registro de data/hora. |
 | **Status em tempo real** | Painel com fila de veículos e status: `Aguardando → Em serviço → Pronto → Entregue`. |
 | **Atribuição de mecânico** | Vincular o responsável pela execução dos serviços. |
 
-### 2.4 Tipos de Serviços
+### 2.4 Tipos de Serviços e Intervalos de Manutenção
 
 | Item | Descrição |
 |---|---|
@@ -56,6 +61,11 @@ Situação atual: MVP funcional com CRUD básico de clientes, veículos e servi�
 | **Preço base por serviço** | Valor padrão editável que pré-preenche o orçamento, com possibilidade de ajuste. |
 | **Tempo estimado** | Duração prevista de cada serviço para gestão da fila. |
 | **Categorias** | Agrupar serviços por categoria: Lubrificação, Suspensão, Elétrico, Funilaria, etc. |
+| **Intervalos por tipo de óleo do motor** | Configurar o próximo retorno conforme o óleo utilizado: Convencional (5.000 km ou 6 meses), Semi-sintético (7.500 km ou 6 meses), Sintético (10.000 km ou 6 meses). |
+| **Intervalos por tipo de câmbio** | Câmbio automático: 30.000 km ou 2 anos; Câmbio manual: 50.000 km ou 2 anos. |
+| **Intervalos de outros fluidos** | Fluido de freio: 20.000 km ou 1 ano; Arrefecimento: 50.000 km ou 2 anos. |
+| **Intervalos de filtros** | Filtro de ar e filtro de combustível: 10.000 km ou 1 ano; Filtro de cabine: uso severo 6 meses/10.000 km, uso normal 10.000 km/1 ano. |
+| **Tipos de óleos selecionáveis** | No registro do serviço, técnico seleciona o tipo de óleo ou fluido utilizado; o sistema calcula automaticamente a data/KM do próximo retorno. |
 
 ### 2.5 Orçamentos
 
@@ -72,9 +82,13 @@ Situação atual: MVP funcional com CRUD básico de clientes, veículos e servi�
 | Item | Descrição |
 |---|---|
 | **Fechamento da OS** | Registrar serviços efetivamente realizados, peças substituídas, KM final e observações técnicas. |
+| **Serviços realizados vs não realizados** | No check-out, para cada item do checklist do check-in, indicar se o serviço foi realizado, não realizado (com motivo) ou adiado, espelhando a estrutura do check-in. |
+| **Fotos no check-out** | Anexar fotos do veículo na saída para comprovar o estado de entrega. |
+| **Campo de observações** | Texto livre para o técnico registrar detalhes sobre os serviços executados ou pendências identificadas. |
+| **Assinatura digital** | Coletar assinatura do cliente e do técnico no momento da entrega do veículo. |
 | **Registro de pagamento** | Forma de pagamento (dinheiro, cartão, Pix), valor pago e troco. |
 | **Geração de recibo/nota** | PDF com resumo dos serviços, valores e dados fiscais básicos para o cliente. |
-| **Atualização automática do veículo** | Check-out atualiza o KM atual, data da última troca e agenda o próximo retorno. |
+| **Atualização automática do veículo** | Check-out atualiza o KM atual, data da última troca e agenda o próximo retorno com base no tipo de óleo/fluido utilizado. |
 
 ---
 
@@ -85,10 +99,12 @@ Situação atual: MVP funcional com CRUD básico de clientes, veículos e servi�
 | Item | Descrição |
 |---|---|
 | **WhatsApp automático** | Integrar com Evolution API ou Baileys para envio programático. Hoje cada lembrete abre uma aba do navegador manualmente. |
-| **Agendamento de lembretes** | Job agendado (node-cron) que rode diariamente e dispare notificações para veículos com manutenção próxima. |
+| **Agendamento automatizado** | Job agendado (node-cron) que rode diariamente e dispare notificações para veículos com manutenção próxima, com base nos intervalos configurados por tipo de óleo/fluido/filtro. |
+| **Aviso de veículo pronto** | Enviar notificação automática (WhatsApp/SMS) ao cliente quando o status da OS mudar para "Pronto", eliminando a ligação manual. |
+| **Tipos de aviso configuráveis** | Definir o conteúdo e o gatilho de cada tipo de mensagem: lembrete de manutenção próxima, veículo pronto para retirada, orçamento aguardando aprovação, parabéns de aniversário, etc. |
 | **Controle de envio** | Registrar data/hora de cada notificação enviada para evitar repetições. |
 | **Lembrete pós-orçamento** | Recontatar automaticamente clientes com orçamento não aprovado após X dias. |
-| **Configuração de antecedência** | Tornar configurável o threshold de alerta (hoje fixo em 7 dias / 500 km). |
+| **Configuração de antecedência** | Tornar configurável o threshold de alerta por tipo de item (hoje fixo em 7 dias / 500 km para troca de óleo). |
 
 ---
 
